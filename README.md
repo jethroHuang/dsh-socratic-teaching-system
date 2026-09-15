@@ -47,7 +47,7 @@ pnpm install --offline --ignore-scripts
 pnpm test
 pnpm run check
 pnpm pack --pack-destination dist
-dsh plugin --profile web add -w ./learning-assistant-dsh-socratic-teaching-system-2.4.0.tgz --offline --ignore-scripts
+dsh plugin --profile web add -w ./dist/learning-assistant-dsh-socratic-teaching-system-0.1.3.tgz --offline --ignore-scripts
 ```
 
 Agent Preset 中只放 consumer，不放 Host service，也不使用 isolate 隔离 Host service：

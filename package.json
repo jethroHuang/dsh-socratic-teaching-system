@@ -1,6 +1,6 @@
 {
   "name": "@learning-assistant/dsh-socratic-teaching-system",
-  "version": "2.4.0",
+  "version": "0.1.3",
   "description": "Reusable DSH Socratic teaching bundle with project-local curriculum, memory and flashcards",
   "type": "module",
   "main": "./host.js",
