@@ -1,4 +1,4 @@
 # Shared service and browser bundle belong to the Profile, never the Agent Preset.
 - insert:
     - id: dsh-socratic-teaching-system
-      name: '@learning-assistant/dsh-socratic-teaching-system'
+      name: 'dsh-socratic-teaching-system'

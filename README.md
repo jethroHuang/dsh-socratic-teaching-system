@@ -47,14 +47,14 @@ pnpm install --offline --ignore-scripts
 pnpm test
 pnpm run check
 pnpm pack --pack-destination dist
-dsh plugin --profile web add -w ./dist/learning-assistant-dsh-socratic-teaching-system-0.1.3.tgz --offline --ignore-scripts
+dsh plugin --profile web add -w ./dist/dsh-socratic-teaching-system-0.1.3.tgz --offline --ignore-scripts
 ```
 
 Agent Preset 中只放 consumer，不放 Host service，也不使用 isolate 隔离 Host service：
 
 ```yaml
 - id: socratic-teaching
-  name: /Users/jethro/.dsh/profiles/web/node_modules/@learning-assistant/dsh-socratic-teaching-system/tool.js
+  name: /Users/jethro/.dsh/profiles/web/node_modules/dsh-socratic-teaching-system/tool.js
 ```
 
 预设 ID：`dsh-socratic-teaching-system`；显示名：`dsh-苏格拉底教学系统`。安装或替换 Profile Bundle 后重启现有 DSH Web Profile。不要启动替代服务器。

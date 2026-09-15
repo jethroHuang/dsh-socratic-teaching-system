@@ -28,7 +28,7 @@ test('browser artifact follows real ModuleLoader protocol and owns UI slot', asy
   let definition; const styles = [];
   const script = await readFile(new URL('../client.js', import.meta.url), 'utf8');
   const React = {createElement() {}, useState() {}, useEffect() {}};
-  vm.runInNewContext(script, {window: {__ModuleLoader__: {load(value) { assert.equal(value.id, '@learning-assistant/dsh-socratic-teaching-system'); definition = value.factory(name => { assert.equal(name, 'react'); return React; }); }}}, document: {createElement() { return {remove() {}, textContent: ''}; }, head: {append(style) { styles.push(style); }}}});
+  vm.runInNewContext(script, {window: {__ModuleLoader__: {load(value) { assert.equal(value.id, 'dsh-socratic-teaching-system'); definition = value.factory(name => { assert.equal(name, 'react'); return React; }); }}}, document: {createElement() { return {remove() {}, textContent: ''}; }, head: {append(style) { styles.push(style); }}}});
   assert.deepEqual(Array.from(definition.inject), ['slots']);
   const cleanup = []; let options;
   definition.apply({effect(operation) { cleanup.push(operation()); }, slots: {inject(name, operation) { assert.equal(name, 'conversation.input.dock'); operation(); }, register(value) { options = value; }}});
