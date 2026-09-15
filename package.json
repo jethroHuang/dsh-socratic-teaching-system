@@ -1,0 +1,14 @@
+{
+  "name": "@learning-assistant/dsh-socratic-teaching-system",
+  "version": "2.4.0",
+  "description": "Reusable DSH Socratic teaching bundle with project-local curriculum, memory and flashcards",
+  "type": "module",
+  "main": "./host.js",
+  "bin": {"dsh-socratic-init": "./init-project.js"},
+  "exports": {".": "./host.js", "./tool": "./tool.js", "./client": "./client.js", "./package.json": "./package.json", "./cordis.patch.yml": "./cordis.patch.yml"},
+  "files": ["*.js", "*.cjs", "*.yml", "starter.tsv", "README.md", "templates/project/**", "test/*.test.js"],
+  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}, "client": {"platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-renderer", "@deepseek-ai/dsh-client-ui-conversation"]}},
+  "dependencies": {"@deepseek-ai/dsh-tools": "0.1.5-rc.2"},
+  "peerDependencies": {"@deepseek-ai/cordis": "^4.0.2"},
+  "scripts": {"test": "node --test test/*.test.js", "check": "node --check host.js && node --check engine.js && node --check project.js && node --check tool.js && node --check client.js && node --check init-project.js", "pack": "pnpm pack --pack-destination dist"}
+}
