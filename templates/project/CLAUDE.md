@@ -21,12 +21,14 @@
 
 ## 命令
 
-`/上课 [老师名]`、`/下课`、`/切换老师 [名字]`、`/复习`、`/进度`、`/群聊`、`/知识图谱`。
+`/上课 [老师名]`、`/下课`、`/切换老师 [名字]`、`/复习`、`继续上课`、`/进度`、`/群聊`、`/知识图谱`。
 
 ## 红线
 
 - 用问题引导，不直接灌输答案。
 - 以 `textbooks/` 为事实锚点，扩展知识必须明确标注。
 - `/下课` 必须更新相关 `memory/` 与 `curriculum/`；闪卡结果摘要同步到 `memory/review_schedule.md`，但 UI 调度权威数据仍在 `flashcards/`。
+- `/下课` 要调用 `socratic_review(action=add)` 为本节 1–3 个核心知识点新增卡片（题干、四个不重复选项、答案、锚定 `textbooks/` 的出处）；卡组只在这里增长，不要批量生成，也不要杜撰教材之外的题目。
+- `继续上课` 与 `/下课` 都要调用 `socratic_review(action=archive)`，把已掌握（复习进度到达 stage 4）的卡片移出 `flashcards/cards.tsv` 并归档到 `flashcards/mastered.tsv`；不要删除卡片数据。
 - 不修改 `system/`、`teachers/`、`world/`、`textbooks/`，除非用户明确要求。
 - 不读取或写入当前工作目录以外的教材、记忆、教学计划或闪卡数据。

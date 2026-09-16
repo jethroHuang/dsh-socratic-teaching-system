@@ -85,9 +85,10 @@
 | 命令 | 功能 | 执行逻辑 |
 |------|------|----------|
 | `/上课` | 开始一节新课 | 按 `system/session_protocol.md` 中定义的**课前流程**启动会话。包括：加载记忆文件、确认学习目标、以当前老师的风格开场问候 |
-| `/下课` | 结束当前课程 | 执行**课后流程**：总结本节课所学、更新所有相关记忆文件、生成课程小结、提出下次课预告 |
+| `/下课` | 结束当前课程 | 执行**课后流程**：总结本节课所学、更新所有相关记忆文件、为本节核心知识点新增闪卡、归档已掌握的闪卡、生成课程小结、提出下次课预告 |
 | `/切换老师 [名字]` | 切换当前授课老师 | 加载 `teachers/[名字].md` 人设文件，用新老师特有的方式向学生打招呼，自然地承接当前教学内容 |
 | `/复习` | 进入复习模式 | 读取 `memory/review_schedule.md`，找出到期的复习任务，针对对应知识点进行苏格拉底式复习提问 |
+| `继续上课` | 复习后回到教学主线 | 读取本会话闪卡成绩（`socratic_review(action=status)`），归档已掌握卡片（`socratic_review(action=archive)`），再按未通过的薄弱点衔接教学（详见 `session_protocol.md` §5.4） |
 | `/进度` | 查看学习进度 | 读取并展示 `memory/learning_progress.md` 的结构化摘要，包括已完成章节、当前章节进度、薄弱知识点 |
 | `/群聊` | 查看未读群聊并可选回复 | 读取 `memory/group_chat_unread.md` 中课后自动生成的群聊复盘，渲染为群聊界面；学生可回复，老师会回应 1–2 条；查看完毕后归档到 `memory/group_chat.md`（详见 `session_protocol.md` §5.3） |
 | `/知识图谱` | 查看知识掌握情况 | 读取 `memory/knowledge_map.md`，以可视化摘要形式展示各知识点的掌握程度（⬜未学 / 🟨初学 / 🟧理解 / 🟩熟练 / ⭐精通），并标记 ⚠️薄弱需复习 项 |
@@ -181,8 +182,10 @@
 | `memory/learning_progress.md` | 本节课完成的内容、新的进度位置 |
 | `memory/knowledge_map.md` | 新发现的薄弱点或已巩固的知识点状态变更 |
 | `memory/review_schedule.md` | 根据今天所学安排未来的复习时间（遵循间隔重复原则） |
+| `flashcards/cards.tsv` | 调用 `socratic_review(action=add)` 为本节 1–3 个核心知识点新增卡片（题面、四个不重复选项、答案、锚定 `textbooks/` 的出处） |
+| `flashcards/cards.tsv` / `flashcards/mastered.tsv` | 调用 `socratic_review(action=archive)` 把已掌握（复习进度到达 stage 4，30 天间隔）的卡片移出卡组，归档保留到 `mastered.tsv` |
 | `memory/bonds/[当前老师]_bond.md` | 本次互动的关键时刻和关系发展 |
-| `memory/group_chat_unread.md` | 课后群聊复盘（三位老师讨论学生本节表现，详见 `session_protocol.md` §4.2.6） |
+| `memory/group_chat_unread.md` | 课后群聊复盘（三位老师讨论学生本节表现，详见 `session_protocol.md` §4.2.8） |
 | `curriculum/syllabus.md` | 如需调整教学计划则更新 |
 
 ### 6.4 核心原则
@@ -212,6 +215,7 @@
 | ✏️ 读写 | `memory/` | 学生记忆数据 |
 | ✏️ 读写 | `temp/` | 临时文件 |
 | ✏️ 读写 | `curriculum/` | 课程计划 |
+| ✏️ 读写 | `flashcards/` | 卡片与复习状态（`cards.tsv` 为卡组，`mastered.tsv` 为已掌握归档，`dsh-state.*.json` 为会话进度） |
 
 ### 7.3 内容安全
 

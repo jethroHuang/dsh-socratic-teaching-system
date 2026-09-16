@@ -1,4 +1,4 @@
-import {readFile, rename, mkdir, lstat, open} from 'node:fs/promises';
+import {readFile, rename, mkdir, lstat, open, readdir} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import C from './core.cjs';
@@ -8,6 +8,7 @@ export function sidCheck(sid) {
   if (typeof sid !== 'string' || !/^session-[A-Za-z0-9-]{1,160}$/.test(sid)) throw Error('无效会话 ID');
   return sid;
 }
+export const MASTERED_FILE = 'mastered.tsv';
 const clone = value => JSON.parse(JSON.stringify(value));
 const blank = sid => ({version: 2, sessionId: sid, revision: 0, visible: false, progress: Object.create(null), round: null});
 function progress(raw) {
@@ -46,7 +47,12 @@ export class ReviewEngine {
     const text = local ?? await readFile(new URL('./starter.tsv', import.meta.url), 'utf8');
     this.cards = C.parse(text);
     if (local === null) await this.atomic('cards.tsv', C.exportTSV(this.cards));
+    this.mastered = await this.readMastered();
     return this;
+  }
+  async readMastered() {
+    const raw = await this.read(MASTERED_FILE);
+    return raw === null ? [] : C.parseMastered(raw);
   }
   async read(name) {
     const path = join(this.root, name);
@@ -78,12 +84,83 @@ export class ReviewEngine {
     return state;
   }
   async commit(state) { await this.atomic('dsh-state.' + state.sessionId + '.json', JSON.stringify(state)); this.cache.set(state.sessionId, state); }
+  async scanMastery() {
+    const best = new Map(), inFlight = new Set(), states = [], skipped = [];
+    for (const name of await readdir(this.root)) {
+      const match = /^dsh-state\.(session-[A-Za-z0-9-]{1,160})\.json$/.exec(name);
+      if (!match) continue;
+      let state;
+      try { state = await this.load(match[1]); }
+      catch { skipped.push(match[1]); continue; }
+      states.push(state);
+      const round = state.round;
+      // Only cards the round has not reached yet must stay: a card the student
+      // already answered is fully recorded in `results`, so archiving it cannot
+      // disturb the round. Position is round-local (cards are cloned at start).
+      if (round && round.index < round.cards.length) for (const card of round.cards.slice(round.index)) inFlight.add(card.ID);
+      for (const [id, entry] of Object.entries(state.progress)) best.set(id, Math.max(best.get(id) ?? -1, entry.stage));
+    }
+    return {best, inFlight, states, skipped};
+  }
+  async archive() {
+    const {best, inFlight, states, skipped} = await this.scanMastery();
+    const mastered = this.cards.filter(card => (best.get(card.ID) ?? -1) >= C.masteredStage && !inFlight.has(card.ID));
+    if (!mastered.length) return {archived: [], remaining: this.cards.length, masteredTotal: this.mastered.length, skippedSessions: skipped};
+    const at = new Date().toISOString();
+    const moving = mastered.map(card => Object.assign({}, card, {MasteredAt: at, MasteredStage: String(best.get(card.ID))}));
+    const byId = new Map(this.mastered.map(entry => [entry.ID, entry]));
+    for (const entry of moving) byId.set(entry.ID, entry);
+    const archived = C.validate([...byId.values()].map(entry => Object.fromEntries(C.fields.map(field => [field, entry[field]]))));
+    const kept = archived.map(entry => byId.get(entry.ID));
+    // Write the archive first: a duplicate across both files can be re-archived,
+    // whereas dropping a card from cards.tsv before it is archived would lose it.
+    await this.atomic(MASTERED_FILE, C.exportMastered(kept));
+    this.mastered = kept;
+    const ids = new Set(mastered.map(card => card.ID));
+    this.cards = this.cards.filter(card => !ids.has(card.ID));
+    await this.atomic('cards.tsv', C.exportTSV(this.cards));
+    // Progress rows for cards no longer in the deck are inert but would make a
+    // restored card look mastered again, so clear them in every session state.
+    for (const state of states) {
+      if (!Object.keys(state.progress).some(id => ids.has(id))) continue;
+      for (const id of ids) delete state.progress[id];
+      await this.commit(state);
+    }
+    return {archived: moving.map(card => ({id: card.ID, question: card.Question, tags: card.Tags, masteredStage: card.MasteredStage})), remaining: this.cards.length, masteredTotal: this.mastered.length, skippedSessions: skipped};
+  }
+  async add(list) {
+    const drafted = C.draftCards(list);
+    const byId = new Map(this.cards.map(card => [card.ID, card]));
+    const added = [], updated = [];
+    for (const card of drafted) (byId.has(card.ID) ? updated : added).push(card);
+    // Archiving keeps an ID in mastered.tsv; letting it also live in cards.tsv
+    // would let a restored duplicate overwrite the archived row.
+    const archivedIds = new Set(this.mastered.map(entry => entry.ID));
+    const conflict = drafted.filter(card => archivedIds.has(card.ID));
+    if (conflict.length) throw Error('以下卡片已存在于已掌握归档，请先 restore 或换一个题干：' + conflict.map(card => card.ID).join('、'));
+    const merged = C.merge(this.cards, drafted);
+    await this.atomic('cards.tsv', C.exportTSV(merged));
+    this.cards = merged;
+    return {added: added.map(card => ({id: card.ID, question: card.Question})), updated: updated.map(card => ({id: card.ID, question: card.Question})), totalCards: this.cards.length, masteredCards: this.mastered.length};
+  }
+  async restore() {
+    if (!this.mastered.length) return {restored: [], remaining: this.cards.length, masteredTotal: 0};
+    const merged = C.merge(this.cards, this.mastered.map(entry => Object.fromEntries(C.fields.map(field => [field, entry[field]]))));
+    await this.atomic('cards.tsv', C.exportTSV(merged));
+    this.cards = merged;
+    const restored = this.mastered.map(entry => entry.ID);
+    this.mastered = [];
+    await this.atomic(MASTERED_FILE, C.exportMastered([]));
+    return {restored, remaining: this.cards.length, masteredTotal: 0};
+  }
   view(state) {
     const round = state.round;
     const card = round?.cards[round.index];
-    return {sessionId: state.sessionId, revision: state.revision, totalCards: this.cards.length, due: this.cards.filter(item => !state.progress[item.ID] || state.progress[item.ID].due <= Date.now()).length, open: state.visible, done: !!round && round.index === round.cards.length, practice: round?.practice || false, index: round?.index || 0, total: round?.cards.length || 0, roundId: round?.id || null, card: card ? {id: card.ID, question: card.Question, source: card.Source, options: C.letters.map(key => ({key, text: card[key]}))} : null, tried: round ? [...round.tried] : [], correct: round?.correct || false, feedback: round?.feedback || '', feedbackKind: round?.feedbackKind || 'hint', results: round ? round.results.map(item => ({id: item.id, question: item.question, passed: item.passed})) : []};
+    return {sessionId: state.sessionId, revision: state.revision, totalCards: this.cards.length, masteredCards: this.mastered.length, due: this.cards.filter(item => !state.progress[item.ID] || state.progress[item.ID].due <= Date.now()).length, open: state.visible, done: !!round && round.index === round.cards.length, practice: round?.practice || false, index: round?.index || 0, total: round?.cards.length || 0, roundId: round?.id || null, card: card ? {id: card.ID, question: card.Question, source: card.Source, options: C.letters.map(key => ({key, text: card[key]}))} : null, tried: round ? [...round.tried] : [], correct: round?.correct || false, feedback: round?.feedback || '', feedbackKind: round?.feedbackKind || 'hint', results: round ? round.results.map(item => ({id: item.id, question: item.question, passed: item.passed})) : []};
   }
   async request(sid, action) {
+    if (action.action === 'archive' || action.action === 'restore') return this.run(async () => { await this.load(sid); return action.action === 'archive' ? this.archive() : this.restore(); });
+    if (action.action === 'add') return this.run(async () => { await this.load(sid); return this.add(action.cards); });
     return this.run(async () => {
       const current = await this.load(sid);
       if (action.action === 'status') return this.view(current);

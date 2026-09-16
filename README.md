@@ -47,7 +47,7 @@ pnpm install --offline --ignore-scripts
 pnpm test
 pnpm run check
 pnpm pack --pack-destination dist
-dsh plugin --profile web add -w ./dist/dsh-socratic-teaching-system-0.1.3.tgz --offline --ignore-scripts
+dsh plugin --profile web add -w ./dist/dsh-socratic-teaching-system-0.1.5.tgz --offline --ignore-scripts
 ```
 
 Agent Preset 中只放 consumer，不放 Host service，也不使用 isolate 隔离 Host service：
@@ -62,12 +62,26 @@ Agent Preset 中只放 consumer，不放 Host service，也不使用 isolate 隔
 ## 使用
 
 - `上课`、`/上课`、`复习`：Agent 先调用 `socratic_review(action=start)`。
-- `继续上课`：Agent 调用 `socratic_review(action=status)` 后按实际薄弱点衔接。
+- `继续上课`：Agent 调用 `socratic_review(action=status)` 读取本会话成绩，再调用 `socratic_review(action=archive)` 归档已掌握卡片，然后按实际薄弱点衔接。
 - 新会话欢迎界面的复习面板最大高度为 `min(68dvh, 720px)`，较长题目和选项有更充足空间，超出时仍可在卡片内部滚动。
 - 闪卡格式：UTF-8、11 列 Anki TSV（ID、Question、A-D、Answer、Hint、Source、Explanation、Tags）。
 - `flashcards/cards.tsv` 是 UI 卡组权威数据；`memory/review_schedule.md` 是 Agent 在 `/下课` 时同步维护的教学摘要。
 - 正式复习每轮最多 5 张；独立答对逐级延长到 3/7/14/30 天，提示、答错或跳过回到 1 天。
 - 每个会话的 UI 轮次和复习进度写入当前项目的 `flashcards/dsh-state.<sessionId>.json`。
+
+### 新卡片的产生
+
+- 卡组**只在 `/下课` 时增长**：Agent 为本节课实际讲过的 1–3 个核心知识点调用 `socratic_review(action=add, cards=[…])` 出题。不批量生成，也不为教材之外的知识点制卡。
+- 每张卡需要题干、四个互不重复的选项、正确答案与锚定 `textbooks/` 的出处；`hint` / `explanation` / `tags` 可选。
+- 引擎会校验并原子写入，单次最多 3 张。卡 ID 由题干自动派生，**同一题干再次出题会更新原卡**，不会产生近似重复项。
+- 新卡初始没有复习进度，因此首次复习即到期。
+
+### 已掌握卡片的归档
+
+- 判定「掌握」以闪卡进度为准：一张卡在**所有会话**的 `dsh-state.*.json` 中到达最高档（stage 4，30 天间隔）即视为已掌握。
+- `继续上课` 与 `/下课` 都会调用 `socratic_review(action=archive)`：把已掌握的卡从 `flashcards/cards.tsv` 移出，写入 `flashcards/mastered.tsv`，复习面板的「已掌握 N」计数随之上升。
+- 归档保留完整卡片字段与 `MasteredAt`/`MasteredStage`，前 11 列与 `cards.tsv` 相同，合并回去即可恢复；也可在面板「Anki 管理」中用「恢复全部已掌握」一键还原，或让 Agent 调用 `socratic_review(action=restore)`。
+- 提示、答错或跳过的卡回到 1 天间隔，不会被归档；学生本轮**尚未答到**的卡片也不会被移除，避免打断正在进行的复习。
 
 ## 安全与限制
 

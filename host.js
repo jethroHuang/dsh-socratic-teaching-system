@@ -43,8 +43,8 @@ export async function apply(ctx) {
       const agent = typeof action?.sessionId === 'string' ? ctx.agents.get(action.sessionId) : undefined;
       if (!enabled(agent)) { send(200, {enabled: false}); return; }
       enrolled = true;
-      if (!['status','start','close','choose','hint','pass','skip','export','import'].includes(action.action)) throw Error('未知操作');
-      if (!['status','export'].includes(action.action) && !Number.isSafeInteger(action.expectedRevision)) throw Error('Mutation requires expectedRevision');
+      if (!['status','start','close','choose','hint','pass','skip','export','import','archive','restore','add'].includes(action.action)) throw Error('未知操作');
+      if (!['status','export','archive','restore','add'].includes(action.action) && !Number.isSafeInteger(action.expectedRevision)) throw Error('Mutation requires expectedRevision');
       const data = await service.request(agent, action);
       send(200, {enabled: true, ...data});
     } catch (error) { send(400, {enabled: enrolled, error: error.message || 'Review request failed'}); }

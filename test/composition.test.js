@@ -38,3 +38,15 @@ test('browser artifact follows real ModuleLoader protocol and owns UI slot', asy
   assert.ok(styles[0].textContent.includes('background:white'));
   cleanup.forEach(operation => operation());
 });
+
+test('every card action is reachable through each layer that gates it', async () => {
+  // The tool schema, host whitelist and client panel must agree on the actions.
+  const tool = await readFile(new URL('../tool.js', import.meta.url), 'utf8');
+  const host = await readFile(new URL('../host.js', import.meta.url), 'utf8');
+  const client = await readFile(new URL('../client.js', import.meta.url), 'utf8');
+  assert.match(tool, /enum: \['start', 'status', 'add', 'archive', 'restore'\]/);
+  assert.match(host, /'archive','restore','add'/);
+  assert.match(client, /kind==='archive'\|\|kind==='restore'/);
+  assert.match(client, /button\('归档已掌握','archive'\)/);
+  assert.match(client, /button\('恢复全部已掌握','restore'\)/);
+});
